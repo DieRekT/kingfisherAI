@@ -1,0 +1,43 @@
+version: "3.9"
+services:
+  api:
+    build:
+      context: .
+      dockerfile: apps/api/Dockerfile
+    environment:
+      # safe placeholders for CI; real values can come from .env locally
+      OPENAI_API_KEY: "test"
+      UNSPLASH_ACCESS_KEY: "test"
+      PEXELS_API_KEY: "test"
+      IMAGE_PROVIDER_ORDER: "unsplash,pexels,generate"
+      APP_ORIGIN: "http://localhost:3000"
+      AI_MODEL_CHAT: "gpt-5-mini"
+      AI_MODEL_REASONING: "o3"
+      AI_REQUEST_TIMEOUT_S: "15"
+      AI_USE_JSON_SCHEMA: "1"
+      SEARCH_PROVIDER: "responses_api"
+      CACHE_TTL_S: "1800"
+      CI: "1"
+      PYTHONUNBUFFERED: "1"
+    ports:
+      - "8000:8000"
+    healthcheck:
+      test: ["CMD", "curl", "-fsS", "http://localhost:8000/health"]
+      interval: 10s
+      timeout: 3s
+      retries: 10
+
+  web:
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        NEXT_PUBLIC_API_URL: "http://api:8000"
+    environment:
+      NEXT_PUBLIC_API_URL: "http://api:8000"
+      NEXT_TELEMETRY_DISABLED: "1"
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "3000:3000"

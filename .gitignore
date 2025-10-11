@@ -1,0 +1,31 @@
+# Dependencies
+node_modules/
+apps/web/node_modules/
+
+# Python
+.venv/
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Environment
+.env
+.env.local
+
+# Next.js
+apps/web/.next/
+apps/web/out/
+apps/web/build/
+
+# Production
+apps/web/dist/
+
+# Misc
+.DS_Store
+*.log
+.idea/
+.vscode/
+
+test-clone/
