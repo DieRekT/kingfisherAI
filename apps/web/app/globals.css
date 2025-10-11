@@ -2,9 +2,120 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body { height:100%; background:#0b1020; }
-.card {
-  @apply rounded-2xl bg-white shadow-xl border border-neutral-200;
+@layer base {
+  :root {
+    --background: 0 0% 100%;
+    --foreground: 222.2 84% 4.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 222.2 84% 4.9%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222.2 84% 4.9%;
+    --primary: 222.2 47.4% 11.2%;
+    --primary-foreground: 210 40% 98%;
+    --secondary: 210 40% 96.1%;
+    --secondary-foreground: 222.2 47.4% 11.2%;
+    --muted: 210 40% 96.1%;
+    --muted-foreground: 215.4 16.3% 46.9%;
+    --accent: 210 40% 96.1%;
+    --accent-foreground: 222.2 47.4% 11.2%;
+    --destructive: 0 84.2% 60.2%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 214.3 31.8% 91.4%;
+    --input: 214.3 31.8% 91.4%;
+    --ring: 222.2 84% 4.9%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222.2 84% 4.9%;
+    --foreground: 210 40% 98%;
+    --card: 222.2 84% 4.9%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222.2 84% 4.9%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 210 40% 98%;
+    --primary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 217.2 32.6% 17.5%;
+    --secondary-foreground: 210 40% 98%;
+    --muted: 217.2 32.6% 17.5%;
+    --muted-foreground: 215 20.2% 65.1%;
+    --accent: 217.2 32.6% 17.5%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 0 62.8% 30.6%;
+    --destructive-foreground: 210 40% 98%;
+    --border: 217.2 32.6% 17.5%;
+    --input: 217.2 32.6% 17.5%;
+    --ring: 212.7 26.8% 83.9%;
+  }
 }
-.chip { @apply text-xs px-2 py-1 rounded-full bg-neutral-100 text-neutral-700; }
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+  body {
+    @apply bg-background text-foreground;
+  }
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    color-scheme: dark;
+  }
+}
+
+html, body {
+  height: 100%;
+}
+
+body {
+  @apply bg-white text-slate-900 dark:bg-[#0b0d10] dark:text-slate-100;
+  font-feature-settings: "ss01" 1, "cv01" 1;
+}
+
+.container-app {
+  @apply mx-auto max-w-[1200px] px-4 sm:px-6 lg:px-8;
+}
+
+.card {
+  @apply rounded-2xl border bg-white/70 backdrop-blur shadow-sm
+         border-slate-200 dark:bg-white/5 dark:border-white/10 dark:shadow-none;
+}
+
+.card-head {
+  @apply px-5 pt-5;
+}
+
+.card-body {
+  @apply px-5 pb-5;
+}
+
+.badge {
+  @apply inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-xs
+         border-slate-200 bg-white text-slate-700
+         dark:border-white/10 dark:bg-white/10 dark:text-slate-200;
+}
+
+.btn {
+  @apply inline-flex items-center justify-center rounded-xl px-4 py-2 text-sm
+         font-medium border shadow-sm transition
+         bg-slate-900 text-white border-slate-900
+         hover:bg-black hover:border-black
+         disabled:opacity-50 disabled:cursor-not-allowed
+         dark:bg-white dark:text-slate-900 dark:hover:bg-slate-100;
+}
+
+.input {
+  @apply w-full rounded-xl border px-3 py-2 text-sm
+         border-slate-300 bg-white shadow-sm
+         focus:outline-none focus:ring-2 focus:ring-slate-900
+         dark:border-white/10 dark:bg-white/5 dark:shadow-none
+         dark:focus:ring-white;
+}
+
+.kbd {
+  @apply inline-flex items-center rounded border px-1.5 py-0.5 text-[11px]
+         bg-white border-slate-200 text-slate-700
+         dark:bg-white/10 dark:border-white/15 dark:text-slate-200;
+}
 

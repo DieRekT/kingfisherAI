@@ -1,5 +1,11 @@
-from pydantic import BaseSettings, Field
+from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field
 import os
+from pathlib import Path
+
+# Find project root (where .env is located)
+BASE_DIR = Path(__file__).resolve().parent.parent.parent
+ENV_FILE = BASE_DIR / ".env"
 
 class Settings(BaseSettings):
     openai_api_key: str = Field("", alias="OPENAI_API_KEY")
@@ -23,8 +29,12 @@ class Settings(BaseSettings):
     # CI flag for stub responses
     ci: bool = Field(False, alias="CI")
 
-    class Config:
-        extra = "ignore"
+    model_config = SettingsConfigDict(
+        env_file=str(ENV_FILE) if ENV_FILE.exists() else None,
+        env_file_encoding='utf-8',
+        extra='ignore',
+        case_sensitive=False
+    )
 
 settings = Settings()
 

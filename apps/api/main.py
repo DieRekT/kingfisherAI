@@ -6,15 +6,40 @@ from starlette.responses import Response
 import asyncio
 import json
 import time
+import logging
 from .config import settings
 from .schemas import ChatResponse
-from .orchestrator import two_pass_answer, pass1_analyze_and_plan, run_tools_parallel, real_images_for_queries, attach_images_to_cards, merge_tool_results_into_cards
+from .orchestrator import (
+    two_pass_answer, 
+    pass1_analyze_and_plan, 
+    run_tools_parallel, 
+    real_images_for_queries, 
+    attach_images_to_cards, 
+    merge_tool_results_into_cards,
+    _is_step_visual_task,
+    _cardify_steps,
+    _attach_step_images
+)
 from openai import AsyncOpenAI
+
+# Configure structured logging
+logging.basicConfig(
+    level=logging.INFO,
+    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s'
+)
+logger = logging.getLogger(__name__)
 
 app = FastAPI(title=settings.app_name)
 
-# CORS: lock to APP_ORIGIN when set
-cors_origins = [settings.app_origin] if settings.app_origin else ["http://localhost:3000"]
+# CORS: parse comma-separated origins from config
+# Default to both localhost and 127.0.0.1 in dev for compatibility
+raw_origins = settings.app_origin or "http://localhost:3000,http://127.0.0.1:3000"
+cors_origins = [o.strip() for o in raw_origins.split(",") if o.strip()]
+
+# Fallback to dev defaults if empty
+if not cors_origins:
+    cors_origins = ["http://localhost:3000", "http://127.0.0.1:3000"]
+
 app.add_middleware(
     CORSMiddleware,
     allow_origins=cors_origins,
@@ -53,13 +78,17 @@ def metrics():
     return Response(generate_latest(), media_type=CONTENT_TYPE_LATEST)
 
 @app.post("/api/chat", response_model=ChatResponse)
-async def chat(payload: dict):
+async def chat(payload: dict, request: Request):
     """Traditional chat endpoint (non-streaming)."""
     t0 = time.time()
-    q = (payload.get("message") or "").strip()
+    # Accept both 'query' and 'message' for flexibility
+    q = (payload.get("query") or payload.get("message") or "").strip()
     if not q:
         kf_requests_total.labels(endpoint="chat", status="400").inc()
-        raise HTTPException(400, "message is required")
+        logger.warning(f"Empty query from {request.client.host if request.client else 'unknown'}")
+        raise HTTPException(400, "query or message is required")
+    
+    logger.info(f"Chat request: query_length={len(q)}, client={request.client.host if request.client else 'unknown'}")
     
     try:
         data = await two_pass_answer(q)
@@ -71,9 +100,12 @@ async def chat(payload: dict):
         for tool in data.get("tool_calls", []):
             kf_tool_calls_total.labels(tool=tool).inc()
         
+        logger.info(f"Chat success: duration={duration:.2f}s, tools={data.get('tool_calls', [])}, model={data.get('model')}")
         return data
     except Exception as e:
+        duration = time.time() - t0
         kf_requests_total.labels(endpoint="chat", status="500").inc()
+        logger.error(f"Chat error after {duration:.2f}s: {str(e)}", exc_info=True)
         raise HTTPException(500, str(e))
 
 async def stream_chat_events(user_prompt: str):
@@ -89,14 +121,24 @@ async def stream_chat_events(user_prompt: str):
         tool_calls = plan.get("tool_calls", [])
         needs_fresh_facts = plan.get("needs_fresh_facts", False)
         
+        # Check if this is a step-visual task and cardify if needed
+        is_step_visual = _is_step_visual_task(user_prompt, plan)
+        if is_step_visual:
+            plan = _cardify_steps(plan)
+        
         # Event 2: Cards (initial, no images/tools yet)
         cards = plan.get("lesson_plan", [])
         yield f"data: {json.dumps({'type': 'cards', 'cards': cards, 'text': plan.get('text', '')})}\n\n"
         await asyncio.sleep(0.1)
         
-        # Pass 2a: Fetch images
+        # Pass 2a: Fetch images (overview queries)
         img_bag = await real_images_for_queries(img_queries) if img_queries else {}
         cards_with_images = attach_images_to_cards(plan, img_bag)
+        
+        # Pass 2a+: Attach step-specific images if step-visual
+        if is_step_visual:
+            plan = await _attach_step_images(user_prompt, plan)
+            cards_with_images = plan.get("lesson_plan", [])
         
         # Pass 2b: Run tools in parallel
         context = {
@@ -141,20 +183,28 @@ async def stream_chat_events(user_prompt: str):
         yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
 
 @app.get("/api/chat/stream")
-async def chat_stream(message: str = ""):
-    """SSE streaming chat endpoint."""
+async def chat_stream(message: str = "", q: str = "", request: Request = None):
+    """SSE streaming chat endpoint - accepts either ?message= or ?q="""
     t0 = time.time()
-    if not message.strip():
+    user_prompt = message or q
+    if not user_prompt.strip():
         kf_requests_total.labels(endpoint="chat_stream", status="400").inc()
-        raise HTTPException(400, "message query parameter is required")
+        logger.warning(f"Empty stream query from {request.client.host if request and request.client else 'unknown'}")
+        raise HTTPException(400, "message or q query parameter is required")
     
+    logger.info(f"Stream request: query_length={len(user_prompt)}, client={request.client.host if request and request.client else 'unknown'}")
     kf_requests_total.labels(endpoint="chat_stream", status="200").inc()
     
     async def event_generator():
-        async for event in stream_chat_events(message):
-            yield event
-        duration = time.time() - t0
-        kf_request_duration.labels(endpoint="chat_stream").observe(duration)
+        try:
+            async for event in stream_chat_events(user_prompt):
+                yield event
+            duration = time.time() - t0
+            kf_request_duration.labels(endpoint="chat_stream").observe(duration)
+            logger.info(f"Stream completed: duration={duration:.2f}s")
+        except Exception as e:
+            logger.error(f"Stream error: {str(e)}", exc_info=True)
+            yield f"data: {json.dumps({'type': 'error', 'message': str(e)})}\n\n"
     
     return StreamingResponse(
         event_generator(),

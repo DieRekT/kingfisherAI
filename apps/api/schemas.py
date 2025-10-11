@@ -86,20 +86,19 @@ PASS1_JSON_SCHEMA = {
                                 "type": "object",
                                 "properties": {
                                     "title": {"type": "string"},
-                                    "body": {"type": "string"},
-                                    "image_query": {"type": "string"}
+                                    "body": {"type": "string"}
                                 },
                                 "required": ["title", "body"],
                                 "additionalProperties": False
                             }
                         }
                     },
-                    "required": ["kind", "title", "steps"],
+                    "required": ["kind", "title", "theme", "summary", "steps"],
                     "additionalProperties": False
                 }
             }
         },
-        "required": ["text", "lesson_plan"],
+        "required": ["text", "needs_fresh_facts", "image_queries", "tool_calls", "lesson_plan"],
         "additionalProperties": False
     }
 }
